@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <raylib.h>
+#include <rlgl.h>
+#include <math.h>
 
 #define SCALE 0.75
 
@@ -10,10 +12,12 @@
 #define GAME_WIDTH ((int)(BASE_WIDTH / 2)) // 960
 #define GAME_HEIGHT ((int)(BASE_HEIGHT / 2))
 
-#define ROWS 14
-#define COLUMNS 26
-#define TILE_SIZE 32
-#define TILE_SPACING 4
+#define ROWS 28
+#define COLUMNS 52
+#define TILE_SIZE 16
+#define TILE_SPACING 2
+#define GRID_OFFSET_X 12
+#define GRID_OFFSET_Y 35
 
 typedef enum {
   EMPTY_TILE,
@@ -21,6 +25,8 @@ typedef enum {
 } TileState;
 
 typedef struct {
+  float timer;
+  float angle;
   TileState state;
 } Tile;
 
@@ -35,6 +41,14 @@ void InitTileGrid(void) {
     for (int column = 0; column < COLUMNS; column++) {
       Tile *tile = &game.tileGrid[row][column];
       tile->state = EMPTY_TILE;
+      tile->angle = 0;
+      tile->timer = (row + 1) * (TILE_SIZE + TILE_SPACING)* (column + 1) * (TILE_SIZE + TILE_SPACING);
+
+      if (row > 5 && row < 10) {
+        if( column > 3 && column < 7) {
+          tile->state = VISITED_TILE;
+        }
+      }
     }
   }
 }
@@ -46,7 +60,7 @@ void InitGame(void) {
 Color GetTileColor(TileState state) {
   switch (state) {
   case EMPTY_TILE:
-    return (Color) {20,20,20,255};
+    return (Color) {70,70,70,255};
   case VISITED_TILE:
     return (Color) {50,50,50,255};
   }
@@ -57,20 +71,50 @@ void DrawTileGrid(void) {
     for (int column = 0; column < COLUMNS; column++) {
       Tile *tile = &game.tileGrid[row][column];
 
-      float drawX = column * (TILE_SIZE + TILE_SPACING);
-      float drawY = row * (TILE_SIZE + TILE_SPACING);
+      float drawX = column * (TILE_SIZE + TILE_SPACING) + GRID_OFFSET_X;
+      float drawY = row * (TILE_SIZE + TILE_SPACING) + GRID_OFFSET_Y;
 
       Vector2 position = (Vector2){
-        .x = drawX,
-        .y = drawY,
+        .x = drawX + TILE_SPACING / 2.0 + (tile->state == EMPTY_TILE ? TILE_SIZE / 4.0 : 0),
+        .y = drawY + TILE_SPACING / 2.0 + (tile->state == EMPTY_TILE ? TILE_SIZE / 4.0 : 0),
       };
       Vector2 size = (Vector2){
-        .x = TILE_SIZE,
-        .y = TILE_SIZE,
+        .x = tile->state == EMPTY_TILE ? TILE_SIZE / 2.0 : TILE_SIZE,
+        .y = tile->state == EMPTY_TILE ? TILE_SIZE / 2.0 :TILE_SIZE,
       };
       Color color = GetTileColor(tile->state);
-      
+
+      Vector2 center = (Vector2) {
+        .x = drawX + TILE_SPACING / 2.0 + TILE_SIZE / 2.0,
+        .y = drawY + TILE_SPACING / 2.0 + TILE_SIZE / 2.0,
+      };
+
+      rlPushMatrix();
+      rlTranslatef(center.x, center.y, 0);
+      rlRotatef(tile->state == EMPTY_TILE ? RAD2DEG * tile->angle : 0, 0, 0, 1);
+      rlTranslatef(-center.x, -center.y, 0);
       DrawRectangleV(position, size, color);
+      rlPopMatrix();
+      // DrawRectangleLinesEx(
+      //   (Rectangle) {
+      //     .x = drawX,
+      //     .y =drawY,
+      //     .width = TILE_SIZE + TILE_SPACING,
+      //     .height = TILE_SIZE + TILE_SPACING,
+      //   },
+      //   1,
+      //   GRAY
+      // );
+    }
+  }
+}
+
+void UpdateTileGrid(float deltaTime){
+  for (int row = 0; row < ROWS; row++) {
+    for (int column = 0; column < COLUMNS; column++) {
+      Tile *tile = &game.tileGrid[row][column];
+      tile->timer += deltaTime;
+      tile->angle = sinf(tile->timer) * PI;
     }
   }
 }
@@ -88,6 +132,8 @@ int main(void) {
 
   while (!WindowShouldClose())
   {
+    float deltaTime = GetFrameTime();
+    UpdateTileGrid(deltaTime);
     BeginTextureMode(target);
       ClearBackground(BLACK);
       DrawTileGrid();
