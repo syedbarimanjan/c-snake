@@ -2,7 +2,9 @@
 #include <raylib.h>
 #include <rlgl.h>
 #include <math.h>
+#include "stb_ds.h"
 
+#define STEP_INTERVAL 0.1
 #define SCALE 0.75
 
 #define BASE_WIDTH 1920
@@ -22,6 +24,7 @@
 typedef enum {
   EMPTY_TILE,
   VISITED_TILE,
+  PLAYER_TILE,
 } TileState;
 
 typedef struct {
@@ -31,7 +34,29 @@ typedef struct {
 } Tile;
 
 typedef struct {
+  int row;
+  int column;
+} Position;
+
+typedef enum {
+  UP_DIRECTION,
+  DOWN_DIRECTION,
+  LEFT_DIRECTION,
+  RIGHT_DIRECTION,
+} Direction;
+
+typedef struct {
+  Position *tiles;
+  TileState value;
+  Direction dir;
+  Direction next_dir;
+  Direction next_next_dir;
+  bool has_next_next_dir;
+} Snake;
+
+typedef struct {
   Tile tileGrid[ROWS][COLUMNS];
+  Snake player;
 } Game;
 
 Game game;
@@ -44,25 +69,47 @@ void InitTileGrid(void) {
       tile->angle = 0;
       tile->timer = (row + 1) * (TILE_SIZE + TILE_SPACING)* (column + 1) * (TILE_SIZE + TILE_SPACING);
 
-      if (row > 5 && row < 10) {
-        if( column > 3 && column < 7) {
-          tile->state = VISITED_TILE;
-        }
-      }
+      // if (row > 5 && row < 10) {
+      //   if( column > 3 && column < 7) {
+      //     tile->state = VISITED_TILE;
+      //   }
+      // }
     }
+  }
+}
+
+void InitSnake(Snake *snake, TileState value, size_t row, size_t column, size_t length) {
+  snake->tiles = nullptr;
+  snake->value = value;
+  snake->dir = RIGHT_DIRECTION;
+  snake->next_dir = RIGHT_DIRECTION;
+  snake->next_next_dir = RIGHT_DIRECTION;
+  snake->has_next_next_dir = false;
+  
+
+  Position start_position = (Position) {
+    .row = row,
+    .column = column
+  };
+
+  for(int i = 0; i < length; i++){
+    arrpush(snake->tiles, start_position);
   }
 }
 
 void InitGame(void) {
   InitTileGrid();
+  InitSnake(&game.player, PLAYER_TILE,13,24,3);
 }
 
 Color GetTileColor(TileState state) {
   switch (state) {
   case EMPTY_TILE:
-    return (Color) {70,70,70,255};
+    return (Color) {20,20,20,255};
   case VISITED_TILE:
     return (Color) {50,50,50,255};
+  case PLAYER_TILE:
+    return (Color) {225,225,225,255};
   }
 }
 
@@ -115,7 +162,100 @@ void UpdateTileGrid(float deltaTime){
       Tile *tile = &game.tileGrid[row][column];
       tile->timer += deltaTime;
       tile->angle = sinf(tile->timer) * PI;
+      tile->state = EMPTY_TILE;
     }
+  }
+}
+
+void SnakeMarkTiles(Snake *snake) {
+  size_t len = arrlen(snake->tiles);
+  for (int i = 0; i < len; i++) {
+    Position *p = &snake->tiles[i];
+    Tile *tile = &game.tileGrid[p->row][p->column];
+    tile->state = snake->value;
+  }
+}
+
+
+void SnakeDoStep(Snake *snake) {
+  snake->dir = snake->next_dir;
+
+  int dx = 0, dy = 0;
+  if (snake->dir == UP_DIRECTION) dy = -1;
+  else if (snake->dir == DOWN_DIRECTION) dy = 1;
+  else if (snake->dir == LEFT_DIRECTION) dx = -1;
+  else if (snake->dir == RIGHT_DIRECTION) dx = 1;
+
+  // x     = value
+  // &x    = address
+  // ptr   = address
+  // *ptr  = value at address
+  Position *head = &snake->tiles[0];
+  Position new_head = (Position) {
+    .row = head->row +dy,
+    .column = head->column +dx,
+  };
+
+  
+
+  if (new_head.row < 0) new_head.row = ROWS -1;
+  else if (new_head.row >= ROWS) new_head.row = 0;
+  else if (new_head.column < 0) new_head.column = COLUMNS - 1;
+  else if (new_head.column >= COLUMNS) new_head.column = 0;
+
+  size_t len = arrlen(snake->tiles);
+  for (int i = len - 1; i > 0; i--) {
+    snake->tiles[i] = snake->tiles[i-1];
+  }
+  snake->tiles[0] = new_head;
+
+  if(snake->has_next_next_dir){
+    snake->next_dir = snake->next_next_dir;
+    snake->has_next_next_dir = false;
+  }
+}
+
+void SnakeHandleInput(Snake *snake) {
+  if(snake->dir == snake->next_dir) {
+
+    if(IsKeyPressed(KEY_LEFT) && snake->dir != RIGHT_DIRECTION) {
+      snake->next_dir = LEFT_DIRECTION;
+    }
+
+    if(IsKeyPressed(KEY_RIGHT) && snake->dir != LEFT_DIRECTION) {
+      snake->next_dir = RIGHT_DIRECTION;
+    }
+
+    if(IsKeyPressed(KEY_UP) && snake->dir != DOWN_DIRECTION) {
+      snake->next_dir = UP_DIRECTION;
+    }
+
+    if(IsKeyPressed(KEY_DOWN) && snake->dir != UP_DIRECTION) {
+      snake->next_dir = DOWN_DIRECTION;
+    }
+
+  } else {
+
+    if(IsKeyPressed(KEY_LEFT) && snake->dir != RIGHT_DIRECTION) {
+      snake->has_next_next_dir = true;
+      snake->next_next_dir = LEFT_DIRECTION;
+    }
+
+    if(IsKeyPressed(KEY_RIGHT) && snake->dir != LEFT_DIRECTION) {
+      snake->has_next_next_dir = true;
+      snake->next_next_dir = RIGHT_DIRECTION;
+    }
+
+    if(IsKeyPressed(KEY_UP) && snake->dir != DOWN_DIRECTION) {
+      snake->has_next_next_dir = true;
+      snake->next_next_dir = UP_DIRECTION;
+    }
+
+    if(IsKeyPressed(KEY_DOWN) && snake->dir != UP_DIRECTION) {
+      snake->has_next_next_dir = true;
+      snake->next_next_dir = DOWN_DIRECTION;
+    }
+
   }
 }
 
@@ -123,41 +263,56 @@ void UpdateTileGrid(float deltaTime){
 int main(void) {
 
   InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "c-snake");
-
+  
   SetTargetFPS(60);
-
+  
   RenderTexture2D target = LoadRenderTexture(GAME_WIDTH,GAME_HEIGHT);
-
+  
   InitGame();
 
+  float stepTimer = 0;
+  
   while (!WindowShouldClose())
   {
     float deltaTime = GetFrameTime();
+    stepTimer += deltaTime;
+
+    SnakeHandleInput(&game.player);
+
     UpdateTileGrid(deltaTime);
+
+    if(stepTimer >= STEP_INTERVAL) {
+      SnakeDoStep(&game.player);
+      stepTimer = 0;
+    }
+    
+    SnakeMarkTiles(&game.player);
+    
     BeginTextureMode(target);
-      ClearBackground(BLACK);
-      DrawTileGrid();
-
+    ClearBackground(BLACK);
+    DrawTileGrid();
+    
     EndTextureMode();
-
+    
     BeginDrawing();
-
-      ClearBackground(BLACK);
-
-      DrawTexturePro(
-        target.texture,
-        (Rectangle) {0,0, GAME_WIDTH, -GAME_HEIGHT},
-        (Rectangle) {0,0, WINDOW_WIDTH, WINDOW_HEIGHT},
-        (Vector2)   {0},
-        0,
-        WHITE
-      );
-
+    
+    ClearBackground(BLACK);
+    
+    DrawTexturePro(
+      target.texture,
+      (Rectangle) {0,0, GAME_WIDTH, -GAME_HEIGHT},
+      (Rectangle) {0,0, WINDOW_WIDTH, WINDOW_HEIGHT},
+      (Vector2)   {0},
+      0,
+      WHITE
+    );
+    
     EndDrawing();
   }
-
+  
   CloseWindow();
-
+  
   return 0;
   
 }
+//////////////////////////////      /////////////////////////////////////
