@@ -3,6 +3,7 @@
 #include <rlgl.h>
 #include <math.h>
 #include "stb_ds.h"
+#include <time.h>
 
 #define STEP_INTERVAL 0.1
 #define SCALE 0.75
@@ -25,12 +26,14 @@ typedef enum {
   EMPTY_TILE,
   VISITED_TILE,
   PLAYER_TILE,
+  FOOD_TILE
 } TileState;
 
 typedef struct {
   float timer;
   float angle;
   TileState state;
+  bool visited;
 } Tile;
 
 typedef struct {
@@ -55,8 +58,14 @@ typedef struct {
 } Snake;
 
 typedef struct {
+  Position position;
+  TileState value;
+} Food;
+
+typedef struct {
   Tile tileGrid[ROWS][COLUMNS];
   Snake player;
+  Food food;
 } Game;
 
 Game game;
@@ -68,6 +77,7 @@ void InitTileGrid(void) {
       tile->state = EMPTY_TILE;
       tile->angle = 0;
       tile->timer = (row + 1) * (TILE_SIZE + TILE_SPACING)* (column + 1) * (TILE_SIZE + TILE_SPACING);
+      tile->visited = false;
 
       // if (row > 5 && row < 10) {
       //   if( column > 3 && column < 7) {
@@ -97,9 +107,28 @@ void InitSnake(Snake *snake, TileState value, size_t row, size_t column, size_t 
   }
 }
 
+void PlaceFoodRandomly(Food *food) {
+  size_t row,column;
+
+  // todo make better randomization
+  do {
+    row = rand() % ROWS;
+    column = rand() % COLUMNS;
+  } while(game.tileGrid[row][column].state != EMPTY_TILE && game.tileGrid[row][column].state != VISITED_TILE);
+
+  food->position.row = row;
+  food->position.column = column;
+}
+
+void InitFood(Food *food){
+  food->value = FOOD_TILE;
+  PlaceFoodRandomly(food);
+}
+
 void InitGame(void) {
   InitTileGrid();
   InitSnake(&game.player, PLAYER_TILE,13,24,3);
+  InitFood(&game.food);
 }
 
 Color GetTileColor(TileState state) {
@@ -110,6 +139,8 @@ Color GetTileColor(TileState state) {
     return (Color) {50,50,50,255};
   case PLAYER_TILE:
     return (Color) {225,225,225,255};
+  case FOOD_TILE:
+    return (Color) {0,225,0,255};
   }
 }
 
@@ -162,7 +193,7 @@ void UpdateTileGrid(float deltaTime){
       Tile *tile = &game.tileGrid[row][column];
       tile->timer += deltaTime;
       tile->angle = sinf(tile->timer) * PI;
-      tile->state = EMPTY_TILE;
+      tile->state = tile->visited ? VISITED_TILE: EMPTY_TILE;
     }
   }
 }
@@ -173,6 +204,7 @@ void SnakeMarkTiles(Snake *snake) {
     Position *p = &snake->tiles[i];
     Tile *tile = &game.tileGrid[p->row][p->column];
     tile->state = snake->value;
+    tile->visited = true;
   }
 }
 
@@ -259,8 +291,20 @@ void SnakeHandleInput(Snake *snake) {
   }
 }
 
+void FoodMarkTile(Food *food){
+  Tile *tile = &game.tileGrid[food->position.row][food->position.column];
+  tile->state = food->value;
+}
+
+void SnakeGrow(Snake *snake) {
+  size_t len = arrlen(snake->tiles);
+  Position last = snake->tiles[len-1];
+  arrpush(snake->tiles,last);
+}
+
 
 int main(void) {
+  srand(time(nullptr));
 
   InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "c-snake");
   
@@ -270,6 +314,7 @@ int main(void) {
   
   InitGame();
 
+  bool foodWasEaten = false;
   float stepTimer = 0;
   
   while (!WindowShouldClose())
@@ -283,10 +328,22 @@ int main(void) {
 
     if(stepTimer >= STEP_INTERVAL) {
       SnakeDoStep(&game.player);
+
+      Position *head = &game.player.tiles[0];
+      if(head->row == game.food.position.row && head->column == game.food.position.column) {
+        SnakeGrow(&game.player);
+        PlaceFoodRandomly(&game.food);
+        foodWasEaten = true;
+      }
       stepTimer = 0;
     }
     
     SnakeMarkTiles(&game.player);
+    if(foodWasEaten){
+      foodWasEaten = false;
+      PlaceFoodRandomly(&game.food);
+    }
+    FoodMarkTile(&game.food);
     
     BeginTextureMode(target);
     ClearBackground(BLACK);
