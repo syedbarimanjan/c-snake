@@ -24,6 +24,17 @@
 
 Font arcadeFont;
 
+typedef struct {
+  float speed;
+  float scale;
+  float target_scale;
+} ScaleEffect;
+
+typedef struct {
+  float duration;
+  float intensity;
+} ShakeEffect;
+
 typedef enum {
   EMPTY_TILE,
   VISITED_TILE,
@@ -457,6 +468,24 @@ void DrawGameOver(){
   );
 }
 
+void UpdateScaleEffect(ScaleEffect *effect, float deltaTime){
+  if(effect->scale != effect->target_scale){
+    effect->scale -= (effect->scale - effect->target_scale) * deltaTime * effect->speed;
+    if(fabs(effect->scale - effect->target_scale) < 0.001) {
+      effect->scale = effect->target_scale;
+    }
+  }
+}
+
+void UpdateShakeEffect(ShakeEffect *effect, float deltaTime) {
+  if(effect->duration > 0){
+    effect->duration -= deltaTime;
+    if(effect->duration < 0) {
+      effect->duration = 0;
+    }
+  }
+}
+
 int main(void) {
   srand(time(nullptr));
 
@@ -466,6 +495,17 @@ int main(void) {
   
   RenderTexture2D target = LoadRenderTexture(GAME_WIDTH,GAME_HEIGHT);
   arcadeFont = LoadFont("ARCADE_R.TTF");
+
+  ScaleEffect scale_effect = (ScaleEffect) {
+    .scale = 1.0,
+    .target_scale = 1.0,
+    .speed = 5.0
+  };
+
+  ShakeEffect shake_effect = (ShakeEffect) {
+    .duration = 0,
+    .intensity = 20
+  };
   
   InitGame();
 
@@ -480,6 +520,8 @@ int main(void) {
     SnakeHandleInput(&game.player);
 
     UpdateTileGrid(deltaTime);
+    UpdateScaleEffect(&scale_effect,deltaTime);
+    UpdateShakeEffect(&shake_effect,deltaTime);
 
     if(stepTimer >= STEP_INTERVAL) {
       MoveClones();
@@ -496,6 +538,10 @@ int main(void) {
         }
 
         game.game_over = CheckForCollisions(&game.player);
+        if(game.game_over) {
+          scale_effect.scale = 1.3;
+          shake_effect.duration = 0.3;
+        }
       }
       stepTimer = 0;
     }
@@ -519,16 +565,32 @@ int main(void) {
     
     BeginDrawing();
     
-    ClearBackground(BLACK);
+      ClearBackground(BLACK);
+
+      float scaledWidth = WINDOW_WIDTH * scale_effect.scale;
+      float scaledHeight = WINDOW_HEIGHT * scale_effect.scale;
+
+      Vector2 shake_offset = {0};
+      if(shake_effect.duration > 0){
+        shake_offset.x = GetRandomValue(-shake_effect.intensity,shake_effect.intensity);
+        shake_offset.y = GetRandomValue(-shake_effect.intensity,shake_effect.intensity);
+      }
+
+      Rectangle destination = (Rectangle) {
+        .x = -(scaledWidth - WINDOW_WIDTH) / 2.0 + shake_offset.x,
+        .y = -(scaledHeight - WINDOW_HEIGHT) / 2.0 + shake_offset.y,
+        .width = scaledWidth,
+        .height = scaledHeight
+      };
     
-    DrawTexturePro(
-      target.texture,
-      (Rectangle) {0,0, GAME_WIDTH, -GAME_HEIGHT},
-      (Rectangle) {0,0, WINDOW_WIDTH, WINDOW_HEIGHT},
-      (Vector2)   {0},
-      0,
-      WHITE
-    );
+      DrawTexturePro(
+        target.texture,
+        (Rectangle) {0,0, GAME_WIDTH, -GAME_HEIGHT},
+        destination,
+        (Vector2)   {0},
+        0,
+        WHITE
+      );
     
     EndDrawing();
 
