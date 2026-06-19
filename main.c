@@ -4,6 +4,9 @@
 #include <math.h>
 #include "stb_ds.h"
 #include <time.h>
+#include <raymath.h>
+
+#define SCORE_ANIMATION_DURATION 0.3
 
 #define STEP_INTERVAL 0.1
 #define SCALE 0.75
@@ -34,6 +37,12 @@ typedef struct {
   float duration;
   float intensity;
 } ShakeEffect;
+
+typedef struct {
+  float scale;
+  float angle;
+  float duration;
+} ScoreEffect;
 
 typedef enum {
   EMPTY_TILE,
@@ -196,6 +205,12 @@ void DrawTileGrid(void) {
         .y = tile->state == EMPTY_TILE ? TILE_SIZE / 2.0 :TILE_SIZE,
       };
       Color color = GetTileColor(tile->state);
+      // show the way to the food a little bit highlighted
+      // if(row == game.food.position.row || column == game.food.position.column) {
+      //   color.r += Clamp(color.r + 1,0,255);
+      //   color.g += Clamp(color.g + 1,0,255);
+      //   color.b += Clamp(color.b + 1,0,255);
+      // }
       color = Fade(color, game.game_over ? 0.7 : 1.0);
 
       Vector2 center = (Vector2) {
@@ -486,6 +501,48 @@ void UpdateShakeEffect(ShakeEffect *effect, float deltaTime) {
   }
 }
 
+void DrawScore(ScoreEffect *effect) {
+  char score_text[32];
+  size_t score_text_font_size = 32;
+  size_t score = arrlen(game.player.tiles);
+  snprintf(score_text,sizeof(score_text),"Length: %zu",score);
+
+  Vector2 score_text_measure = MeasureTextEx(arcadeFont,score_text,score_text_font_size,0);
+
+  Vector2 draw_position = (Vector2) {
+    .x = GAME_WIDTH / 2.0 - score_text_measure.x / 2.0,
+    .y = 4
+  };
+
+  Vector2 new_origin = (Vector2) {
+    .x = GAME_WIDTH / 2.0,
+    .y = 4 + score_text_measure.y / 2.0,
+  };
+
+  rlPushMatrix();
+  rlTranslatef(new_origin.x,new_origin.y,0);
+  rlRotatef(effect->angle,0,0,1);
+  rlScalef(effect->scale,effect->scale,1);
+  rlTranslatef(-new_origin.x,-new_origin.y,0);
+  DrawTextEx(arcadeFont,score_text,draw_position,score_text_font_size,0,WHITE);
+  rlPopMatrix();
+}
+
+void UpdateScoreEffect(ScoreEffect *effect, float deltaTime) {
+  if(effect->duration > 0) {
+    effect->duration -= deltaTime;
+    if(effect->duration <= 0) {
+      effect->duration = 0;
+      effect->scale = 1;
+      effect->angle = 0;
+    } else {
+      float time = 1.0 - effect->duration / SCORE_ANIMATION_DURATION;
+      effect->scale = Lerp(1.3,1.0,time);
+      effect->angle = Lerp(effect->angle,0,time); 
+    }
+  }
+}
+
 int main(void) {
   srand(time(nullptr));
 
@@ -506,6 +563,12 @@ int main(void) {
     .duration = 0,
     .intensity = 20
   };
+
+  ScoreEffect score_effect = (ScoreEffect) {
+    .duration = 0,
+    .angle = 0,
+    .scale = 1.0,
+  };
   
   InitGame();
 
@@ -522,6 +585,7 @@ int main(void) {
     UpdateTileGrid(deltaTime);
     UpdateScaleEffect(&scale_effect,deltaTime);
     UpdateShakeEffect(&shake_effect,deltaTime);
+    UpdateScoreEffect(&score_effect,deltaTime);
 
     if(stepTimer >= STEP_INTERVAL) {
       MoveClones();
@@ -535,6 +599,9 @@ int main(void) {
           SnakeGrow(&game.player);
           PlaceFoodRandomly(&game.food);
           foodWasEaten = true;
+          score_effect.duration = SCORE_ANIMATION_DURATION;
+          score_effect.angle = GetRandomValue(-10,10);
+          score_effect.scale = 1.3;
         }
 
         game.game_over = CheckForCollisions(&game.player);
@@ -557,6 +624,7 @@ int main(void) {
     BeginTextureMode(target);
       ClearBackground(BLACK);
       DrawTileGrid();
+      DrawScore(&score_effect);
       if(game.game_over){
         DrawGameOver();
       }
