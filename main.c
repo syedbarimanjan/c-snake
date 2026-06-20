@@ -554,10 +554,13 @@ int main(void) {
   RenderTexture2D tmpA = LoadRenderTexture(GAME_WIDTH,GAME_HEIGHT);
   RenderTexture2D tmpB = LoadRenderTexture(GAME_WIDTH,GAME_HEIGHT);
   RenderTexture2D blurred = LoadRenderTexture(GAME_WIDTH,GAME_HEIGHT);
+  RenderTexture2D scanlined = LoadRenderTexture(GAME_WIDTH,GAME_HEIGHT);
   
   Shader thresholdShader = LoadShader(0,"assets/shaders/threshold.frag");
   Shader blurShader = LoadShader(0,"assets/shaders/blur.frag");
+  Shader scanlineShader = LoadShader(0,"assets/shaders/scanline.frag");
   int blurDirectionLoc = GetShaderLocation(blurShader,"direction");
+  float scanlineTimeLoc = GetShaderLocation(scanlineShader,"time");
   arcadeFont = LoadFont("ARCADE_R.TTF");
 
   ScaleEffect scale_effect = (ScaleEffect) {
@@ -581,11 +584,13 @@ int main(void) {
 
   bool foodWasEaten = false;
   float stepTimer = 0;
+  float globalTimer = 0;
   
   while (!WindowShouldClose())
   {
     float deltaTime = GetFrameTime();
     stepTimer += deltaTime;
+    globalTimer += deltaTime;
 
     SnakeHandleInput(&game.player);
 
@@ -707,7 +712,21 @@ int main(void) {
           WHITE
         );
       EndBlendMode();
+    EndTextureMode();
 
+    BeginTextureMode(scanlined);
+      ClearBackground(BLACK);
+      BeginShaderMode(scanlineShader);
+      SetShaderValue(scanlineShader,scanlineTimeLoc,&globalTimer,SHADER_UNIFORM_FLOAT);
+        DrawTexturePro(
+          blurred.texture,
+          (Rectangle) {0,0,blurred.texture.width,-blurred.texture.height},
+          (Rectangle) {0,0,scanlined.texture.width,scanlined.texture.height},
+          (Vector2) {0},
+          0,
+          WHITE
+        );
+      EndShaderMode();
     EndTextureMode();
     
     BeginDrawing();
@@ -731,7 +750,7 @@ int main(void) {
       };
     
       DrawTexturePro(
-        blurred.texture,
+        scanlined.texture,
         (Rectangle) {0,0, GAME_WIDTH, -GAME_HEIGHT},
         destination,
         (Vector2)   {0},
