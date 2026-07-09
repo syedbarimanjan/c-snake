@@ -110,24 +110,18 @@ void InitTileGrid(void) {
       tile->angle = 0;
       tile->timer = (row + 1) * (TILE_SIZE + TILE_SPACING)* (column + 1) * (TILE_SIZE + TILE_SPACING);
       tile->visited = false;
-
-      // if (row > 5 && row < 10) {
-      //   if( column > 3 && column < 7) {
-      //     tile->state = VISITED_TILE;
-      //   }
-      // }
     }
   }
 }
 
 void InitSnake(Snake *snake, TileState value, size_t row, size_t column, size_t length, bool is_player) {
-  snake->tiles = nullptr;
+  snake->tiles = NULL;
   snake->value = value;
   snake->dir = RIGHT_DIRECTION;
   snake->next_dir = RIGHT_DIRECTION;
   snake->next_next_dir = RIGHT_DIRECTION;
   snake->has_next_next_dir = false;
-  
+
 
   Position start_position = (Position) {
     .row = row,
@@ -162,10 +156,10 @@ void InitFood(Food *food){
 }
 
 void InitGame(void) {
-  game.player_path = nullptr;
-  game.clones = nullptr;
+  game.player_path = NULL;
+  game.clones = NULL;
   game.game_over = false;
-  
+
   InitTileGrid();
   InitSnake(&game.player, PLAYER_TILE,13,24,3,true);
   InitFood(&game.food);
@@ -174,11 +168,11 @@ void InitGame(void) {
 Color GetTileColor(TileState state) {
   switch (state) {
   case EMPTY_TILE:
-    return (Color) {20,20,20,255};
+    return (Color) {200,20,20,255};
   case VISITED_TILE:
     return (Color) {50,50,50,255};
   case PLAYER_TILE:
-    return (Color) {225,225,225,255};
+    return YELLOW;
   case FOOD_TILE:
     return (Color) {0,225,0,255};
   case CLONE_TILE:
@@ -206,11 +200,11 @@ void DrawTileGrid(void) {
       };
       Color color = GetTileColor(tile->state);
       // show the way to the food a little bit highlighted
-      // if(row == game.food.position.row || column == game.food.position.column) {
-      //   color.r += Clamp(color.r + 1,0,255);
-      //   color.g += Clamp(color.g + 1,0,255);
-      //   color.b += Clamp(color.b + 1,0,255);
-      // }
+      if(row == game.food.position.row || column == game.food.position.column) {
+        color.r += Clamp(color.r + 100,0,255);
+        color.g += Clamp(color.g + 100,0,255);
+        color.b += Clamp(color.b + 100,0,255);
+      }
       color = Fade(color, game.game_over ? 0.7 : 1.0);
 
       Vector2 center = (Vector2) {
@@ -220,20 +214,19 @@ void DrawTileGrid(void) {
 
       rlPushMatrix();
       rlTranslatef(center.x, center.y, 0);
-      rlRotatef(tile->state == EMPTY_TILE ? RAD2DEG * tile->angle : 0, 0, 0, 1);
       rlTranslatef(-center.x, -center.y, 0);
       DrawRectangleV(position, size, color);
       rlPopMatrix();
-      // DrawRectangleLinesEx(
-      //   (Rectangle) {
-      //     .x = drawX,
-      //     .y =drawY,
-      //     .width = TILE_SIZE + TILE_SPACING,
-      //     .height = TILE_SIZE + TILE_SPACING,
-      //   },
-      //   1,
-      //   GRAY
-      // );
+      DrawRectangleLinesEx(
+        (Rectangle) {
+          .x = drawX,
+          .y =drawY,
+          .width = TILE_SIZE + TILE_SPACING,
+          .height = TILE_SIZE + TILE_SPACING,
+        },
+        1,
+        BLACK
+      );
     }
   }
 }
@@ -255,7 +248,7 @@ void SnakeMarkTiles(Snake *snake) {
     Position *p = &snake->tiles[i];
     Tile *tile = &game.tileGrid[p->row][p->column];
     tile->visited = true;
-    
+
     bool is_player_tile = tile->state == PLAYER_TILE || tile->state == CLONE_AND_PLAYER_TILE;
     bool is_clone_tile = tile->state == CLONE_TILE || tile->state == CLONE_AND_PLAYER_TILE;
 
@@ -287,7 +280,7 @@ void SnakeDoStep(Snake *snake) {
     .column = head->column +dx,
   };
 
-  
+
 
   if (new_head.row < 0) new_head.row = ROWS -1;
   else if (new_head.row >= ROWS) new_head.row = 0;
@@ -436,9 +429,9 @@ bool CheckForCollisions(Snake *player){
         return true;
       }
     }
-     
+
   }
-  
+
   return false;
 }
 
@@ -464,7 +457,7 @@ void DrawGameOver(){
     },
     game_over_font_size,
     0,
-    WHITE
+    BLACK
   );
 
   const char *restart_game_text = "Press Enter To Restart Game!";
@@ -479,7 +472,7 @@ void DrawGameOver(){
     },
     restart_game_font_size,
     0,
-    WHITE
+    BLACK
   );
 }
 
@@ -524,7 +517,7 @@ void DrawScore(ScoreEffect *effect) {
   rlRotatef(effect->angle,0,0,1);
   rlScalef(effect->scale,effect->scale,1);
   rlTranslatef(-new_origin.x,-new_origin.y,0);
-  DrawTextEx(arcadeFont,score_text,draw_position,score_text_font_size,0,WHITE);
+  DrawTextEx(arcadeFont,score_text,draw_position,score_text_font_size,0,BLACK);
   rlPopMatrix();
 }
 
@@ -538,24 +531,24 @@ void UpdateScoreEffect(ScoreEffect *effect, float deltaTime) {
     } else {
       float time = 1.0 - effect->duration / SCORE_ANIMATION_DURATION;
       effect->scale = Lerp(1.3,1.0,time);
-      effect->angle = Lerp(effect->angle,0,time); 
+      effect->angle = Lerp(effect->angle,0,time);
     }
   }
 }
 
 int main(void) {
-  srand(time(nullptr));
+  srand(time(NULL));
 
   InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "c-snake");
-  
+
   SetTargetFPS(60);
-  
+
   RenderTexture2D target = LoadRenderTexture(GAME_WIDTH,GAME_HEIGHT);
   RenderTexture2D tmpA = LoadRenderTexture(GAME_WIDTH,GAME_HEIGHT);
   RenderTexture2D tmpB = LoadRenderTexture(GAME_WIDTH,GAME_HEIGHT);
   RenderTexture2D blurred = LoadRenderTexture(GAME_WIDTH,GAME_HEIGHT);
   RenderTexture2D scanlined = LoadRenderTexture(GAME_WIDTH,GAME_HEIGHT);
-  
+
   Shader thresholdShader = LoadShader(0,"assets/shaders/threshold.frag");
   Shader blurShader = LoadShader(0,"assets/shaders/blur.frag");
   Shader scanlineShader = LoadShader(0,"assets/shaders/scanline.frag");
@@ -579,13 +572,13 @@ int main(void) {
     .angle = 0,
     .scale = 1.0,
   };
-  
+
   InitGame();
 
   bool foodWasEaten = false;
   float stepTimer = 0;
   float globalTimer = 0;
-  
+
   while (!WindowShouldClose())
   {
     float deltaTime = GetFrameTime();
@@ -603,7 +596,7 @@ int main(void) {
       MoveClones();
       if(!game.game_over) {
         SnakeDoStep(&game.player);
-  
+
         Position *head = &game.player.tiles[0];
         if(head->row == game.food.position.row && head->column == game.food.position.column) {
           ReduceClones();
@@ -624,7 +617,7 @@ int main(void) {
       }
       stepTimer = 0;
     }
-    
+
     SnakeMarkTiles(&game.player);
     ClonesMarkTiles();
     if(foodWasEaten){
@@ -632,20 +625,20 @@ int main(void) {
       PlaceFoodRandomly(&game.food);
     }
     FoodMarkTile(&game.food);
-    
+
     BeginTextureMode(target);
-      ClearBackground(BLACK);
+      ClearBackground(BEIGE);
       DrawTileGrid();
       DrawScore(&score_effect);
       if(game.game_over){
         DrawGameOver();
       }
       DrawFPS(10,10);
-    
+
     EndTextureMode();
 
     BeginTextureMode(tmpA);
-      ClearBackground(BLACK);
+      ClearBackground(BEIGE);
       BeginShaderMode(thresholdShader);
         DrawTexturePro(
           target.texture,
@@ -657,10 +650,10 @@ int main(void) {
         );
       EndShaderMode();
     EndTextureMode();
-    
+
     for(int i = 0; i < 10; i++){
       BeginTextureMode(tmpB);
-        ClearBackground(BLACK);
+        ClearBackground(BEIGE);
         BeginShaderMode(blurShader);
           SetShaderValue(blurShader,blurDirectionLoc, &(Vector2){1.0 / tmpA.texture.width,0},SHADER_UNIFORM_VEC2);
           DrawTexturePro(
@@ -673,10 +666,10 @@ int main(void) {
           );
         EndShaderMode();
       EndTextureMode();
-      
-  
+
+
       BeginTextureMode(tmpA);
-        ClearBackground(BLACK);
+        ClearBackground(BEIGE);
         BeginShaderMode(blurShader);
           SetShaderValue(blurShader,blurDirectionLoc, &(Vector2){0,1.0 / tmpB.texture.height},SHADER_UNIFORM_VEC2);
           DrawTexturePro(
@@ -692,7 +685,7 @@ int main(void) {
     }
 
     BeginTextureMode(blurred);
-      ClearBackground(BLACK);
+      ClearBackground(BEIGE);
       DrawTexturePro(
         target.texture,
         (Rectangle){0,0,target.texture.width,-target.texture.height},
@@ -715,7 +708,7 @@ int main(void) {
     EndTextureMode();
 
     BeginTextureMode(scanlined);
-      ClearBackground(BLACK);
+      ClearBackground(BEIGE);
       BeginShaderMode(scanlineShader);
       SetShaderValue(scanlineShader,scanlineTimeLoc,&globalTimer,SHADER_UNIFORM_FLOAT);
         DrawTexturePro(
@@ -728,10 +721,10 @@ int main(void) {
         );
       EndShaderMode();
     EndTextureMode();
-    
+
     BeginDrawing();
-    
-      ClearBackground(BLACK);
+
+      ClearBackground(BEIGE);
 
       float scaledWidth = WINDOW_WIDTH * scale_effect.scale;
       float scaledHeight = WINDOW_HEIGHT * scale_effect.scale;
@@ -748,7 +741,7 @@ int main(void) {
         .width = scaledWidth,
         .height = scaledHeight
       };
-    
+
       DrawTexturePro(
         scanlined.texture,
         (Rectangle) {0,0, GAME_WIDTH, -GAME_HEIGHT},
@@ -757,17 +750,16 @@ int main(void) {
         0,
         WHITE
       );
-    
+
     EndDrawing();
 
     if(game.game_over && IsKeyPressed(KEY_ENTER)){
       RestartGame();
     }
   }
-  
+
   CloseWindow();
-  
+
   return 0;
-  
+
 }
-//////////////////////////////      /////////////////////////////////////
