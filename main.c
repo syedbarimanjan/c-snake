@@ -18,8 +18,8 @@
 #define GAME_WIDTH ((int)(BASE_WIDTH / 2)) // 960
 #define GAME_HEIGHT ((int)(BASE_HEIGHT / 2))
 
-#define ROWS 28
-#define COLUMNS 52
+#define ROWS 52
+#define COLUMNS 104
 #define TILE_SIZE 16
 #define TILE_SPACING 2
 #define GRID_OFFSET_X 12
@@ -201,9 +201,9 @@ void DrawTileGrid(void) {
       Color color = GetTileColor(tile->state);
       // show the way to the food a little bit highlighted
       if(row == game.food.position.row || column == game.food.position.column) {
-        color.r += Clamp(color.r + 100,0,255);
-        color.g += Clamp(color.g + 100,0,255);
-        color.b += Clamp(color.b + 100,0,255);
+        color.r += Clamp(color.r + 70,0,255);
+        color.g += Clamp(color.g + 70,0,255);
+        color.b += Clamp(color.b + 70,0,255);
       }
       color = Fade(color, game.game_over ? 0.7 : 1.0);
 
@@ -543,6 +543,13 @@ int main(void) {
 
   SetTargetFPS(60);
 
+  Camera2D camera = (Camera2D) {
+    .offset = (Vector2){GAME_WIDTH /2,GAME_HEIGHT/2},
+    // .target = (Vector2){0,0},
+    .zoom = 1,
+    .rotation = 0,
+  };
+
   RenderTexture2D target = LoadRenderTexture(GAME_WIDTH,GAME_HEIGHT);
   RenderTexture2D tmpA = LoadRenderTexture(GAME_WIDTH,GAME_HEIGHT);
   RenderTexture2D tmpB = LoadRenderTexture(GAME_WIDTH,GAME_HEIGHT);
@@ -579,6 +586,10 @@ int main(void) {
   float stepTimer = 0;
   float globalTimer = 0;
 
+  float tileWidth = TILE_SIZE + TILE_SPACING; 
+  float worldWidth  = COLUMNS * (TILE_SIZE + TILE_SPACING);
+  float worldHeight = ROWS    * (TILE_SIZE + TILE_SPACING);
+  
   while (!WindowShouldClose())
   {
     float deltaTime = GetFrameTime();
@@ -628,13 +639,24 @@ int main(void) {
 
     BeginTextureMode(target);
       ClearBackground(BEIGE);
-      DrawTileGrid();
+      camera.target.x = Clamp(
+        game.player.tiles[0].column * tileWidth + TILE_SIZE / 2.0f,
+        camera.offset.x,
+        GRID_OFFSET_X + worldWidth - camera.offset.x + GRID_OFFSET_X
+      );
+      camera.target.y = Clamp(
+        game.player.tiles[0].row * tileWidth + TILE_SIZE / 2.0f,
+        camera.offset.y,
+        GRID_OFFSET_Y + worldHeight - camera.offset.y + GRID_OFFSET_X
+      );
+      BeginMode2D(camera);
+        DrawTileGrid();
+      EndMode2D();
       DrawScore(&score_effect);
       if(game.game_over){
         DrawGameOver();
       }
       DrawFPS(10,10);
-
     EndTextureMode();
 
     BeginTextureMode(tmpA);
@@ -742,14 +764,16 @@ int main(void) {
         .height = scaledHeight
       };
 
-      DrawTexturePro(
-        scanlined.texture,
-        (Rectangle) {0,0, GAME_WIDTH, -GAME_HEIGHT},
-        destination,
-        (Vector2)   {0},
-        0,
-        WHITE
-      );
+      // BeginMode2D(camera);
+        DrawTexturePro(
+          scanlined.texture,
+          (Rectangle) {0,0, GAME_WIDTH, -GAME_HEIGHT},
+          destination,
+          (Vector2)   {0},
+          0,
+          WHITE
+        );
+        // EndMode2D();
 
     EndDrawing();
 
